@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
 
@@ -70,79 +71,114 @@ interface User {
   username: string;
   email: string;
   isPremium: boolean;
+  badge: string;
   registeredAt: string;
   servers: number;
   mods: number;
   posts: number;
 }
 
+interface GameServer {
+  id: string;
+  name: string;
+  type: string;
+  status: 'online' | 'offline' | 'starting';
+  players: number;
+  maxPlayers: number;
+  ip: string;
+  port: number;
+  createdAt: string;
+  expiresAt: string;
+}
+
+interface WebServer {
+  id: string;
+  name: string;
+  url: string;
+  forumType: string;
+  status: 'active' | 'installing' | 'stopped';
+  createdAt: string;
+  expiresAt: string;
+  daysLeft: number;
+}
+
+interface Launcher {
+  id: string;
+  name: string;
+  type: string;
+  version: string;
+  autoUpdate: boolean;
+  connectedServer?: string;
+}
+
 const Index = () => {
   const [activeSection, setActiveSection] = useState<string>('main');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
+  const [isCreateWebServerOpen, setIsCreateWebServerOpen] = useState(false);
+  const [isLauncherConfigOpen, setIsLauncherConfigOpen] = useState(false);
+  const [selectedLauncher, setSelectedLauncher] = useState<Launcher | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [installedMods, setInstalledMods] = useState<Set<string>>(new Set(['Радмир РП']));
+  const [gameServers, setGameServers] = useState<GameServer[]>([]);
+  const [webServers, setWebServers] = useState<WebServer[]>([]);
+  const [launchers, setLaunchers] = useState<Launcher[]>([]);
   const { toast } = useToast();
 
   const navItems = [
     { id: 'launchers', title: 'Лаунчеры', icon: 'Rocket', color: 'bg-blue-500 hover:bg-blue-600' },
-    { id: 'hosting', title: 'Хостинг', icon: 'Server', color: 'bg-green-500 hover:bg-green-600' },
+    { id: 'servers', title: 'Мои Серверы', icon: 'Server', color: 'bg-green-500 hover:bg-green-600' },
+    { id: 'webservers', title: 'Веб Сервера', icon: 'Globe', color: 'bg-cyan-500 hover:bg-cyan-600' },
     { id: 'mods', title: 'Моды', icon: 'Package', color: 'bg-purple-500 hover:bg-purple-600' },
     { id: 'forum', title: 'Форум', icon: 'MessageSquare', color: 'bg-orange-500 hover:bg-orange-600' },
     { id: 'profile', title: 'Профиль', icon: 'User', color: 'bg-pink-500 hover:bg-pink-600' },
     { id: 'support', title: 'Поддержка', icon: 'Headphones', color: 'bg-yellow-500 hover:bg-yellow-600' },
   ];
 
-  const launchers = [
+  const launcherTemplates = [
     {
       name: 'Родина РП',
       platforms: ['ПК', 'Мобайл'],
       description: 'Классический лаунчер с автоустановкой модов',
       icon: 'Home',
-      downloadUrl: '#',
+      type: 'rodina',
     },
     {
       name: 'Аризона РП',
       platforms: ['ПК', 'Мобайл'],
       description: 'Современный лаунчер с поддержкой кастомизации',
       icon: 'Palmtree',
-      downloadUrl: '#',
+      type: 'arizona',
     },
     {
       name: 'Радмир РП',
       platforms: ['ПК', 'Мобайл'],
       description: 'Быстрый запуск с оптимизацией',
       icon: 'Zap',
-      downloadUrl: '#',
+      type: 'radmir',
     },
   ];
 
-  const hostingPlans = [
-    {
-      name: 'Starter',
-      price: 'Бесплатно',
-      features: ['1 сервер', '512 МБ RAM', '5 ГБ диск', 'Автоустановка модов'],
-      icon: 'Sparkles',
-    },
-    {
-      name: 'Pro',
-      price: 'Бесплатно',
-      features: ['3 сервера', '2 ГБ RAM', '20 ГБ диск', 'Автоустановка сайта'],
-      icon: 'Star',
-      popular: true,
-    },
-    {
-      name: 'Ultimate',
-      price: 'Бесплатно',
-      features: ['∞ серверов', '8 ГБ RAM', '100 ГБ диск', 'Premium поддержка'],
-      icon: 'Crown',
-    },
+  const forumTemplates = [
+    { id: 'rodina', name: 'Родина РП', description: 'Классический форум в стиле Родина РП' },
+    { id: 'arizona', name: 'Аризона РП', description: 'Современный форум Аризона РП' },
+    { id: 'radmir', name: 'Радмир РП', description: 'Минималистичный форум Радмир РП' },
+    { id: 'custom', name: 'Пустой сайт', description: 'Чистая страница без форума' },
   ];
 
   const modPacks = [
     { name: 'Родина РП', mods: 45, size: '2.3 ГБ' },
     { name: 'Аризона РП', mods: 38, size: '1.8 ГБ' },
     { name: 'Радмир РП', mods: 52, size: '2.7 ГБ' },
+  ];
+
+  const badgeOptions = [
+    { id: 'vip', name: 'VIP', color: 'bg-yellow-500', icon: 'Star' },
+    { id: 'admin', name: 'Админ', color: 'bg-red-500', icon: 'Shield' },
+    { id: 'moderator', name: 'Модератор', color: 'bg-blue-500', icon: 'ShieldCheck' },
+    { id: 'developer', name: 'Разработчик', color: 'bg-purple-500', icon: 'Code' },
+    { id: 'helper', name: 'Хелпер', color: 'bg-green-500', icon: 'Heart' },
   ];
 
   const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
@@ -155,6 +191,7 @@ const Index = () => {
       username,
       email,
       isPremium: true,
+      badge: 'vip',
       registeredAt: new Date().toLocaleDateString('ru-RU'),
       servers: 0,
       mods: 1,
@@ -175,9 +212,10 @@ const Index = () => {
       username: 'Игрок #1234',
       email: 'player@ismailov.host',
       isPremium: true,
+      badge: 'admin',
       registeredAt: '15.12.2024',
-      servers: 3,
-      mods: 12,
+      servers: gameServers.length,
+      mods: installedMods.size,
       posts: 48,
     };
     setUser(mockUser);
@@ -188,14 +226,90 @@ const Index = () => {
     });
   };
 
-  const handleDownloadLauncher = (launcher: string) => {
+  const handleCreateGameServer = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const formData = new FormData(e.currentTarget);
+    const serverName = formData.get('serverName') as string;
+    const serverType = formData.get('serverType') as string;
+
+    const newServer: GameServer = {
+      id: `gs-${Date.now()}`,
+      name: serverName,
+      type: serverType,
+      status: 'starting',
+      players: 0,
+      maxPlayers: 100,
+      ip: `server-${Date.now()}.ismailov.host`,
+      port: 7777 + gameServers.length,
+      createdAt: new Date().toLocaleDateString('ru-RU'),
+      expiresAt: new Date(Date.now() + 300 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU'),
+    };
+
+    setGameServers([...gameServers, newServer]);
+    setIsCreateServerOpen(false);
+
+    setTimeout(() => {
+      setGameServers(prev => prev.map(s => 
+        s.id === newServer.id ? { ...s, status: 'online' as const } : s
+      ));
+      toast({
+        title: '✅ Сервер запущен!',
+        description: `${serverName} готов к работе`,
+      });
+    }, 3000);
+
     toast({
-      title: '⬇️ Загрузка начата',
-      description: `Лаунчер ${launcher} скачивается...`,
+      title: '🚀 Сервер создаётся...',
+      description: 'Установка займёт несколько секунд',
+    });
+
+    setUser({ ...user, servers: user.servers + 1 });
+  };
+
+  const handleCreateWebServer = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const formData = new FormData(e.currentTarget);
+    const siteName = formData.get('siteName') as string;
+    const forumType = formData.get('forumType') as string;
+
+    const subdomain = siteName.toLowerCase().replace(/\s+/g, '-');
+    const newWebServer: WebServer = {
+      id: `ws-${Date.now()}`,
+      name: siteName,
+      url: `https://${subdomain}.ismailov.host`,
+      forumType: forumType,
+      status: 'installing',
+      createdAt: new Date().toLocaleDateString('ru-RU'),
+      expiresAt: new Date(Date.now() + 300 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU'),
+      daysLeft: 300,
+    };
+
+    setWebServers([...webServers, newWebServer]);
+    setIsCreateWebServerOpen(false);
+
+    const forumName = forumTemplates.find(f => f.id === forumType)?.name || 'сайт';
+    
+    setTimeout(() => {
+      setWebServers(prev => prev.map(s => 
+        s.id === newWebServer.id ? { ...s, status: 'active' as const } : s
+      ));
+      toast({
+        title: '✅ Сайт готов!',
+        description: `Ваш ${forumName} доступен по адресу ${newWebServer.url}`,
+      });
+    }, 5000);
+
+    toast({
+      title: '🌐 Создаём веб-сервер...',
+      description: `Установка ${forumName}...`,
     });
   };
 
-  const handleCreateServer = (plan: string) => {
+  const handleInstallLauncher = (template: typeof launcherTemplates[0]) => {
     if (!user) {
       toast({
         title: '❌ Требуется авторизация',
@@ -204,11 +318,40 @@ const Index = () => {
       setIsRegisterOpen(true);
       return;
     }
+
+    const newLauncher: Launcher = {
+      id: `launcher-${Date.now()}`,
+      name: template.name,
+      type: template.type,
+      version: '1.0.0',
+      autoUpdate: true,
+    };
+
+    setLaunchers([...launchers, newLauncher]);
     toast({
-      title: '✅ Сервер создан!',
-      description: `Ваш ${plan} сервер готов к использованию`,
+      title: '✅ Лаунчер установлен!',
+      description: `${template.name} готов к использованию`,
     });
-    setUser({ ...user, servers: user.servers + 1 });
+  };
+
+  const handleConfigureLauncher = (launcher: Launcher) => {
+    setSelectedLauncher(launcher);
+    setIsLauncherConfigOpen(true);
+  };
+
+  const handleConnectServerToLauncher = (serverId: string) => {
+    if (!selectedLauncher) return;
+
+    setLaunchers(launchers.map(l => 
+      l.id === selectedLauncher.id ? { ...l, connectedServer: serverId } : l
+    ));
+
+    const server = gameServers.find(s => s.id === serverId);
+    toast({
+      title: '✅ Сервер подключен!',
+      description: `${selectedLauncher.name} подключен к ${server?.name}`,
+    });
+    setIsLauncherConfigOpen(false);
   };
 
   const handleInstallMods = (modPack: string) => {
@@ -229,6 +372,25 @@ const Index = () => {
     setUser({ ...user, mods: user.mods + 1 });
   };
 
+  const handleChangeBadge = (badgeId: string) => {
+    if (!user) return;
+    setUser({ ...user, badge: badgeId });
+    const badge = badgeOptions.find(b => b.id === badgeId);
+    toast({
+      title: '✅ Значок изменён!',
+      description: `Теперь у вас значок ${badge?.name}`,
+    });
+  };
+
+  const handleTogglePremium = () => {
+    if (!user) return;
+    setUser({ ...user, isPremium: !user.isPremium });
+    toast({
+      title: user.isPremium ? '❌ Premium отключен' : '✅ Premium активирован!',
+      description: user.isPremium ? 'Premium статус деактивирован' : 'Premium статус активирован навсегда!',
+    });
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case 'launchers':
@@ -236,14 +398,72 @@ const Index = () => {
           <div className="space-y-6 animate-fade-in">
             <div className="text-center space-y-4 mb-12">
               <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent glow-text">
-                <span className="lights-string">🎮</span> Лаунчеры для CRMP <span className="lights-string">🎮</span>
+                <span className="lights-string">🎮</span> Управление Лаунчерами <span className="lights-string">🎮</span>
               </h1>
               <p className="text-muted-foreground text-lg">
-                Выберите лаунчер и настройте под свой проект
+                Настройте лаунчеры и подключите их к серверам
               </p>
             </div>
+
+            {launchers.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold mb-4">Установленные Лаунчеры</h2>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {launchers.map((launcher) => {
+                    const server = gameServers.find(s => s.id === launcher.connectedServer);
+                    return (
+                      <Card key={launcher.id} className="border-primary/20 bg-card/50 backdrop-blur">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-xl">{launcher.name}</CardTitle>
+                              <CardDescription>Версия {launcher.version}</CardDescription>
+                            </div>
+                            <Badge className="bg-green-500">Активен</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {launcher.connectedServer ? (
+                            <div className="p-3 rounded-lg bg-secondary">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Icon name="Link" size={16} className="text-green-400" />
+                                <span>Подключен к: {server?.name}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {server?.ip}:{server?.port}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 rounded-lg bg-secondary/50">
+                              <span className="text-sm text-muted-foreground">Сервер не подключен</span>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1"
+                              onClick={() => handleConfigureLauncher(launcher)}
+                            >
+                              <Icon name="Settings" size={14} className="mr-2" />
+                              Настроить
+                            </Button>
+                            <Button size="sm" className="flex-1">
+                              <Icon name="Play" size={14} className="mr-2" />
+                              Запустить
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <h2 className="text-2xl font-bold mb-4">Доступные Лаунчеры</h2>
             <div className="grid md:grid-cols-3 gap-6">
-              {launchers.map((launcher) => (
+              {launcherTemplates.map((launcher) => (
                 <Card key={launcher.name} className="hover:scale-105 transition-transform border-primary/20 bg-card/50 backdrop-blur float-animation">
                   <CardHeader>
                     <div className="flex items-center gap-3 mb-2">
@@ -264,10 +484,10 @@ const Index = () => {
                     </div>
                     <Button 
                       className="w-full bg-primary hover:bg-primary/90"
-                      onClick={() => handleDownloadLauncher(launcher.name)}
+                      onClick={() => handleInstallLauncher(launcher)}
                     >
                       <Icon name="Download" size={16} className="mr-2" />
-                      Скачать
+                      Установить
                     </Button>
                   </CardContent>
                 </Card>
@@ -276,59 +496,213 @@ const Index = () => {
           </div>
         );
 
-      case 'hosting':
+      case 'servers':
         return (
           <div className="space-y-6 animate-fade-in">
             <div className="text-center space-y-4 mb-12">
               <h1 className="text-5xl font-bold bg-gradient-to-r from-green-400 via-emerald-400 to-green-400 bg-clip-text text-transparent glow-text">
-                <span className="lights-string">🖥️</span> Бесплатный Хостинг <span className="lights-string">🖥️</span>
+                <span className="lights-string">🖥️</span> Мои Игровые Серверы <span className="lights-string">🖥️</span>
               </h1>
               <p className="text-muted-foreground text-lg">
-                Разместите свой сервер за пару кликов
+                Управляйте своими CRMP серверами
               </p>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
-              {hostingPlans.map((plan, idx) => (
-                <Card
-                  key={plan.name}
-                  className={`hover:scale-105 transition-transform border-green-500/20 bg-card/50 backdrop-blur float-animation ${
-                    plan.popular ? 'ring-2 ring-green-500' : ''
-                  }`}
-                  style={{ animationDelay: `${idx * 0.2}s` }}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-lg bg-green-500/10">
-                          <Icon name={plan.icon} className="text-green-400 lights-string" size={24} />
-                        </div>
-                        <CardTitle className="text-xl">{plan.name}</CardTitle>
+
+            <Button 
+              size="lg" 
+              className="mb-6 bg-green-500 hover:bg-green-600"
+              onClick={() => {
+                if (!user) {
+                  toast({
+                    title: '❌ Требуется авторизация',
+                    description: 'Пожалуйста, войдите или зарегистрируйтесь',
+                  });
+                  setIsRegisterOpen(true);
+                  return;
+                }
+                setIsCreateServerOpen(true);
+              }}
+            >
+              <Icon name="Plus" size={20} className="mr-2" />
+              Создать Сервер (300 дней бесплатно)
+            </Button>
+
+            {gameServers.length === 0 ? (
+              <Card className="border-green-500/20 bg-card/50 backdrop-blur">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Icon name="Server" size={64} className="text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground text-lg">У вас пока нет серверов</p>
+                  <p className="text-sm text-muted-foreground">Создайте первый сервер бесплатно!</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                {gameServers.map((server) => (
+                  <Card key={server.id} className="border-green-500/20 bg-card/50 backdrop-blur float-animation">
+                    <CardHeader>
+                      <div className="flex items-center justify-between mb-2">
+                        <CardTitle className="text-xl">{server.name}</CardTitle>
+                        <Badge className={
+                          server.status === 'online' ? 'bg-green-500' :
+                          server.status === 'starting' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }>
+                          {server.status === 'online' ? 'Онлайн' :
+                           server.status === 'starting' ? 'Запускается' :
+                           'Оффлайн'}
+                        </Badge>
                       </div>
-                      {plan.popular && (
-                        <Badge className="bg-green-500 text-white lights-string">Популярный</Badge>
-                      )}
-                    </div>
-                    <div className="text-3xl font-bold text-green-400 glow-text">{plan.price}</div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <ul className="space-y-2">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-center gap-2">
-                          <Icon name="Check" size={16} className="text-green-400" />
-                          <span className="text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button 
-                      className="w-full bg-green-500 hover:bg-green-600"
-                      onClick={() => handleCreateServer(plan.name)}
-                    >
-                      Создать сервер
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+                      <CardDescription>{server.type}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">IP адрес:</span>
+                          <span className="font-mono">{server.ip}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Порт:</span>
+                          <span className="font-mono">{server.port}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Игроки:</span>
+                          <span>{server.players}/{server.maxPlayers}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Создан:</span>
+                          <span>{server.createdAt}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Истекает:</span>
+                          <span>{server.expiresAt}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1">
+                          <Icon name="Settings" size={14} className="mr-2" />
+                          Настройки
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1">
+                          <Icon name="BarChart" size={14} className="mr-2" />
+                          Статистика
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'webservers':
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <div className="text-center space-y-4 mb-12">
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent glow-text">
+                <span className="lights-string">🌐</span> Мои Веб Сервера <span className="lights-string">🌐</span>
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Создайте форум или сайт за 5 минут
+              </p>
             </div>
+
+            <Button 
+              size="lg" 
+              className="mb-6 bg-cyan-500 hover:bg-cyan-600"
+              onClick={() => {
+                if (!user) {
+                  toast({
+                    title: '❌ Требуется авторизация',
+                    description: 'Пожалуйста, войдите или зарегистрируйтесь',
+                  });
+                  setIsRegisterOpen(true);
+                  return;
+                }
+                setIsCreateWebServerOpen(true);
+              }}
+            >
+              <Icon name="Plus" size={20} className="mr-2" />
+              Создать Веб-Сервер (300 дней бесплатно)
+            </Button>
+
+            {webServers.length === 0 ? (
+              <Card className="border-cyan-500/20 bg-card/50 backdrop-blur">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Icon name="Globe" size={64} className="text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground text-lg">У вас пока нет веб-серверов</p>
+                  <p className="text-sm text-muted-foreground">Создайте форум или сайт бесплатно на 300 дней!</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                {webServers.map((server) => (
+                  <Card key={server.id} className="border-cyan-500/20 bg-card/50 backdrop-blur float-animation">
+                    <CardHeader>
+                      <div className="flex items-center justify-between mb-2">
+                        <CardTitle className="text-xl">{server.name}</CardTitle>
+                        <Badge className={
+                          server.status === 'active' ? 'bg-green-500' :
+                          server.status === 'installing' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }>
+                          {server.status === 'active' ? 'Активен' :
+                           server.status === 'installing' ? 'Установка' :
+                           'Остановлен'}
+                        </Badge>
+                      </div>
+                      <CardDescription>
+                        {forumTemplates.find(f => f.id === server.forumType)?.name}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 rounded-lg bg-secondary">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Icon name="Link" size={16} className="text-cyan-400" />
+                          <span className="text-sm font-semibold">Адрес сайта:</span>
+                        </div>
+                        <a 
+                          href={server.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-cyan-400 hover:text-cyan-300 font-mono text-sm break-all underline"
+                        >
+                          {server.url}
+                        </a>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Создан:</span>
+                          <span>{server.createdAt}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Осталось дней:</span>
+                          <span className="font-bold text-cyan-400">{server.daysLeft}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Истекает:</span>
+                          <span>{server.expiresAt}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          className="flex-1 bg-cyan-500 hover:bg-cyan-600"
+                          onClick={() => window.open(server.url, '_blank')}
+                        >
+                          <Icon name="ExternalLink" size={14} className="mr-2" />
+                          Открыть
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1">
+                          <Icon name="Settings" size={14} className="mr-2" />
+                          Настройки
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         );
 
@@ -427,9 +801,17 @@ const Index = () => {
                   <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center ring-4 ring-yellow-500 ring-offset-4 ring-offset-background">
                     <Icon name="Crown" size={48} className="text-white lights-string" />
                   </div>
-                  <Badge className="mx-auto mb-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold lights-string">
-                    ⭐ PREMIUM ⭐
-                  </Badge>
+                  {user.isPremium && (
+                    <Badge className="mx-auto mb-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold lights-string">
+                      ⭐ PREMIUM ⭐
+                    </Badge>
+                  )}
+                  {user.badge && (
+                    <Badge className={`mx-auto mb-2 ${badgeOptions.find(b => b.id === user.badge)?.color} text-white`}>
+                      <Icon name={badgeOptions.find(b => b.id === user.badge)?.icon || 'Star'} size={14} className="mr-1" />
+                      {badgeOptions.find(b => b.id === user.badge)?.name}
+                    </Badge>
+                  )}
                   <CardTitle className="text-2xl">{user.username}</CardTitle>
                   <CardDescription>{user.email}</CardDescription>
                   <CardDescription>Зарегистрирован {user.registeredAt}</CardDescription>
@@ -449,28 +831,72 @@ const Index = () => {
                       <div className="text-sm text-muted-foreground">Сообщений</div>
                     </div>
                   </div>
-                  <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+                  
+                  <Card className="bg-secondary/50">
                     <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Icon name="Gift" size={20} className="lights-string" />
-                        Преимущества Premium
-                      </CardTitle>
+                      <CardTitle className="text-lg">Настройки профиля</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Icon name="Check" size={16} className="text-green-400" />
-                        <span className="text-sm">Безлимитные серверы</span>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label className="mb-2 block">Выбрать значок</Label>
+                        <div className="flex gap-2 flex-wrap">
+                          {badgeOptions.map((badge) => (
+                            <Button
+                              key={badge.id}
+                              size="sm"
+                              variant={user.badge === badge.id ? "default" : "outline"}
+                              className={user.badge === badge.id ? badge.color : ''}
+                              onClick={() => handleChangeBadge(badge.id)}
+                            >
+                              <Icon name={badge.icon} size={14} className="mr-1" />
+                              {badge.name}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Icon name="Check" size={16} className="text-green-400" />
-                        <span className="text-sm">Приоритетная поддержка 24/7</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Icon name="Check" size={16} className="text-green-400" />
-                        <span className="text-sm">Все моды бесплатно</span>
+                      
+                      <div className="pt-4 border-t border-border">
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={handleTogglePremium}
+                        >
+                          <Icon name={user.isPremium ? "X" : "Crown"} size={16} className="mr-2" />
+                          {user.isPremium ? 'Отключить Premium' : 'Включить Premium'}
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
+
+                  {user.isPremium && (
+                    <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Icon name="Gift" size={20} className="lights-string" />
+                          Преимущества Premium
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Icon name="Check" size={16} className="text-green-400" />
+                          <span className="text-sm">Безлимитные серверы</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Icon name="Check" size={16} className="text-green-400" />
+                          <span className="text-sm">Приоритетная поддержка 24/7</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Icon name="Check" size={16} className="text-green-400" />
+                          <span className="text-sm">Все моды бесплатно</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Icon name="Check" size={16} className="text-green-400" />
+                          <span className="text-sm">Все значки доступны</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
                   <Button 
                     className="w-full bg-pink-500 hover:bg-pink-600"
                     onClick={() => setUser(null)}
@@ -581,7 +1007,7 @@ const Index = () => {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {navItems.map((item, idx) => (
+              {navItems.slice(0, 6).map((item, idx) => (
                 <Card
                   key={item.id}
                   className="hover:scale-105 transition-all cursor-pointer border-border/50 bg-card/50 backdrop-blur group float-animation"
@@ -646,20 +1072,28 @@ const Index = () => {
                 variant="outline" 
                 size="sm"
                 onClick={() => setActiveSection('profile')}
+                className="flex items-center gap-2"
               >
-                <Icon name="User" size={16} className="mr-2" />
-                {user.username}
-                {user.isPremium && <Icon name="Crown" size={14} className="ml-2 text-yellow-400 lights-string" />}
+                <Icon name="User" size={16} />
+                <span className="hidden sm:inline">{user.username}</span>
+                {user.isPremium && <Icon name="Crown" size={14} className="text-yellow-400 lights-string" />}
+                {user.badge && (
+                  <Icon 
+                    name={badgeOptions.find(b => b.id === user.badge)?.icon || 'Star'} 
+                    size={14} 
+                    className={`${badgeOptions.find(b => b.id === user.badge)?.color.replace('bg-', 'text-')}`}
+                  />
+                )}
               </Button>
             ) : (
               <>
                 <Button variant="outline" size="sm" onClick={() => setIsLoginOpen(true)}>
                   <Icon name="LogIn" size={16} className="mr-2" />
-                  Войти
+                  <span className="hidden sm:inline">Войти</span>
                 </Button>
                 <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => setIsRegisterOpen(true)}>
                   <Icon name="UserPlus" size={16} className="mr-2" />
-                  Регистрация
+                  <span className="hidden sm:inline">Регистрация</span>
                 </Button>
               </>
             )}
@@ -748,6 +1182,125 @@ const Index = () => {
               Войти
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateServerOpen} onOpenChange={setIsCreateServerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Создать Игровой Сервер</DialogTitle>
+            <DialogDescription>
+              Бесплатно на 300 дней
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateGameServer} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="serverName">Название сервера</Label>
+              <Input id="serverName" name="serverName" placeholder="Мой CRMP Сервер" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serverType">Тип сервера</Label>
+              <Select name="serverType" required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите тип" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Родина РП">Родина РП</SelectItem>
+                  <SelectItem value="Аризона РП">Аризона РП</SelectItem>
+                  <SelectItem value="Радмир РП">Радмир РП</SelectItem>
+                  <SelectItem value="Пустой сервер">Пустой сервер</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full bg-green-500 hover:bg-green-600">
+              <Icon name="Plus" size={16} className="mr-2" />
+              Создать Сервер
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateWebServerOpen} onOpenChange={setIsCreateWebServerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Создать Веб-Сервер</DialogTitle>
+            <DialogDescription>
+              С автоустановкой форума. Бесплатно на 300 дней
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateWebServer} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="siteName">Название сайта</Label>
+              <Input id="siteName" name="siteName" placeholder="Мой Форум" required />
+              <p className="text-xs text-muted-foreground">
+                Будет доступен как: название.ismailov.host
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="forumType">Тип форума (автоустановка)</Label>
+              <Select name="forumType" required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите тип" />
+                </SelectTrigger>
+                <SelectContent>
+                  {forumTemplates.map((forum) => (
+                    <SelectItem key={forum.id} value={forum.id}>
+                      {forum.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {forumTemplates.find(f => f.id === 'rodina')?.description}
+              </p>
+            </div>
+            <Card className="bg-cyan-500/10 border-cyan-500/30">
+              <CardContent className="pt-4">
+                <p className="text-sm">
+                  При выборе форума будет автоматически установлен готовый шаблон со всеми настройками!
+                </p>
+              </CardContent>
+            </Card>
+            <Button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600">
+              <Icon name="Plus" size={16} className="mr-2" />
+              Создать Веб-Сервер
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isLauncherConfigOpen} onOpenChange={setIsLauncherConfigOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Настройка Лаунчера</DialogTitle>
+            <DialogDescription>
+              {selectedLauncher?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Подключить к серверу</Label>
+              {gameServers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">У вас нет серверов. Создайте сервер в разделе "Мои Серверы"</p>
+              ) : (
+                <div className="space-y-2">
+                  {gameServers.map((server) => (
+                    <Button
+                      key={server.id}
+                      variant="outline"
+                      className="w-full justify-between"
+                      onClick={() => handleConnectServerToLauncher(server.id)}
+                    >
+                      <span>{server.name}</span>
+                      {selectedLauncher?.connectedServer === server.id && (
+                        <Icon name="Check" size={16} className="text-green-400" />
+                      )}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
